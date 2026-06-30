@@ -779,19 +779,23 @@
       <div class="console-grid">
         <div class="console-cell">
           <div class="c-label">Market Cap</div>
-          <div class="c-value" id="live-mcap">Loading...</div>
+          <div class="c-value" id="live-mcap">—</div>
         </div>
         <div class="console-cell">
           <div class="c-label">Price</div>
-          <div class="c-value" id="live-price">Loading...</div>
+          <div class="c-value" id="live-price">—</div>
         </div>
         <div class="console-cell">
           <div class="c-label">24H Volume</div>
-          <div class="c-value" id="live-volume">Loading...</div>
+          <div class="c-value" id="live-volume">—</div>
         </div>
         <div class="console-cell">
           <div class="c-label">Liquidity</div>
-          <div class="c-value amber" id="live-liquidity">Loading...</div>
+          <div class="c-value" id="live-liquidity">—</div>
+        </div>
+        <div class="console-cell">
+          <div class="c-label">24H Change</div>
+          <div class="c-value" id="live-change">—</div>
         </div>
       </div>
       <div class="ca-row">
@@ -996,46 +1000,62 @@
   }, { threshold: 0.12 });
   revealEls.forEach(el => io.observe(el));
 
-  // Live Token Data via DexScreener
+  // Live Token Data via DexScreener — aggregated across all pairs
   async function fetchLiveStats() {
     try {
       const res = await fetch('https://api.dexscreener.com/latest/dex/tokens/0x73ac2806c40ab4741ea7a35b7328aca957755ba3');
       const data = await res.json();
       if (data && data.pairs && data.pairs.length > 0) {
-        // Find best base pair (usually the first one with highest liquidity)
-        const pair = data.pairs.find(p => p.chainId === 'base') || data.pairs[0];
-        
-        const mcap = pair.marketCap;
-        const price = pair.priceUsd;
-        const volume = pair.volume && pair.volume.h24 ? pair.volume.h24 : 0;
-        const liquidity = pair.liquidity && pair.liquidity.usd ? pair.liquidity.usd : 0;
+        const basePairs = data.pairs.filter(p => p.chainId === 'base');
+        const pairs = basePairs.length > 0 ? basePairs : data.pairs;
+
+        // Best pair = highest liquidity (most accurate price)
+        const bestPair = pairs.reduce((a, b) =>
+          (a.liquidity?.usd || 0) > (b.liquidity?.usd || 0) ? a : b
+        );
+
+        // Aggregate totals across all pairs
+        const totalVolume = pairs.reduce((sum, p) => sum + (p.volume?.h24 || 0), 0);
+        const totalLiquidity = pairs.reduce((sum, p) => sum + (p.liquidity?.usd || 0), 0);
+        const mcap = bestPair.marketCap || bestPair.fdv || 0;
+        const price = bestPair.priceUsd || 0;
+        const priceChange24h = bestPair.priceChange?.h24 || 0;
 
         const formatCurrency = (val) => {
-          if (!val) return '$0.00';
-          if (val >= 1000000) return '$' + (val / 1000000).toFixed(2) + 'M';
-          if (val >= 1000) return '$' + (val / 1000).toFixed(2) + 'K';
+          if (!val || val === 0) return '$0';
+          if (val >= 1_000_000) return '$' + (val / 1_000_000).toFixed(2) + 'M';
+          if (val >= 1_000) return '$' + (val / 1_000).toFixed(1) + 'K';
           return '$' + parseFloat(val).toFixed(2);
         };
 
         const formatPrice = (val) => {
           if (!val) return '$0.00';
           const p = parseFloat(val);
-          if (p < 0.0001) return '$' + p.toFixed(6);
-          if (p < 0.01) return '$' + p.toFixed(4);
-          return '$' + p.toFixed(2);
+          if (p < 0.000001) return '$' + p.toFixed(9);
+          if (p < 0.0001) return '$' + p.toFixed(7);
+          if (p < 0.01) return '$' + p.toFixed(6);
+          return '$' + p.toFixed(4);
         };
 
         document.getElementById('live-mcap').textContent = formatCurrency(mcap);
         document.getElementById('live-price').textContent = formatPrice(price);
-        document.getElementById('live-volume').textContent = formatCurrency(volume);
-        document.getElementById('live-liquidity').textContent = formatCurrency(liquidity);
+        document.getElementById('live-volume').textContent = formatCurrency(totalVolume);
+        document.getElementById('live-liquidity').textContent = formatCurrency(totalLiquidity);
+
+        // Price change colouring
+        const changeEl = document.getElementById('live-change');
+        if (changeEl) {
+          const sign = priceChange24h >= 0 ? '+' : '';
+          changeEl.textContent = sign + priceChange24h.toFixed(2) + '%';
+          changeEl.style.color = priceChange24h >= 0 ? 'var(--green)' : 'var(--red)';
+        }
       }
     } catch (err) {
       console.error('Failed to fetch live stats', err);
-      document.getElementById('live-mcap').textContent = 'Error';
-      document.getElementById('live-price').textContent = 'Error';
-      document.getElementById('live-volume').textContent = 'Error';
-      document.getElementById('live-liquidity').textContent = 'Error';
+      ['live-mcap','live-price','live-volume','live-liquidity'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.textContent = '—';
+      });
     }
   }
 
