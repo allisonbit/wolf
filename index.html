@@ -957,7 +957,8 @@
   // Theme Toggle
   const themeBtn = document.getElementById('themeBtn');
   const currentTheme = localStorage.getItem('theme');
-  if (currentTheme === 'light') {
+  // Default to light mode
+  if (currentTheme !== 'dark') {
     document.documentElement.classList.add('light-mode');
     themeBtn.textContent = '☾';
   }
