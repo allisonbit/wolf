@@ -10,6 +10,13 @@
 <meta property="og:description" content="Track $WOLF live stats. The White Wolf on Base.">
 <meta property="og:type" content="website">
 
+<script>
+  // Apply theme immediately to prevent color glitch/flash
+  if (localStorage.getItem('theme') !== 'dark') {
+    document.documentElement.classList.add('light-mode');
+  }
+</script>
+
 <style>
   :root {
     --bg: #060807;
@@ -956,12 +963,7 @@
 <script>
   // Theme Toggle
   const themeBtn = document.getElementById('themeBtn');
-  const currentTheme = localStorage.getItem('theme');
-  // Default to light mode
-  if (currentTheme !== 'dark') {
-    document.documentElement.classList.add('light-mode');
-    themeBtn.textContent = '☾';
-  }
+  themeBtn.textContent = document.documentElement.classList.contains('light-mode') ? '☾' : '☀';
   
   themeBtn.addEventListener('click', () => {
     document.documentElement.classList.toggle('light-mode');
