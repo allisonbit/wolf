@@ -4,6 +4,11 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>$WOLF // TARGET ACQUIRED</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🐺</text></svg>">
+<meta name="description" content="$WOLF - The White Wolf on Base">
+<meta property="og:title" content="$WOLF // TARGET ACQUIRED">
+<meta property="og:description" content="Track $WOLF live stats. The White Wolf on Base.">
+<meta property="og:type" content="website">
 
 <style>
   :root {
@@ -732,19 +737,19 @@
       <div class="console-grid">
         <div class="console-cell">
           <div class="c-label">Market Cap</div>
-          <div class="c-value">$150.94K</div>
+          <div class="c-value" id="live-mcap">Loading...</div>
+        </div>
+        <div class="console-cell">
+          <div class="c-label">Price</div>
+          <div class="c-value" id="live-price">Loading...</div>
         </div>
         <div class="console-cell">
           <div class="c-label">24H Volume</div>
-          <div class="c-value">$594.95K</div>
+          <div class="c-value" id="live-volume">Loading...</div>
         </div>
         <div class="console-cell">
           <div class="c-label">Liquidity</div>
-          <div class="c-value">$81.14K</div>
-        </div>
-        <div class="console-cell">
-          <div class="c-label">Holders</div>
-          <div class="c-value amber">408</div>
+          <div class="c-value amber" id="live-liquidity">Loading...</div>
         </div>
       </div>
       <div class="ca-row">
@@ -939,6 +944,53 @@
     });
   }, { threshold: 0.12 });
   revealEls.forEach(el => io.observe(el));
+
+  // Live Token Data via DexScreener
+  async function fetchLiveStats() {
+    try {
+      const res = await fetch('https://api.dexscreener.com/latest/dex/tokens/0x73ac2806c40ab4741ea7a35b7328aca957755ba3');
+      const data = await res.json();
+      if (data && data.pairs && data.pairs.length > 0) {
+        // Find best base pair (usually the first one with highest liquidity)
+        const pair = data.pairs.find(p => p.chainId === 'base') || data.pairs[0];
+        
+        const mcap = pair.marketCap;
+        const price = pair.priceUsd;
+        const volume = pair.volume && pair.volume.h24 ? pair.volume.h24 : 0;
+        const liquidity = pair.liquidity && pair.liquidity.usd ? pair.liquidity.usd : 0;
+
+        const formatCurrency = (val) => {
+          if (!val) return '$0.00';
+          if (val >= 1000000) return '$' + (val / 1000000).toFixed(2) + 'M';
+          if (val >= 1000) return '$' + (val / 1000).toFixed(2) + 'K';
+          return '$' + parseFloat(val).toFixed(2);
+        };
+
+        const formatPrice = (val) => {
+          if (!val) return '$0.00';
+          const p = parseFloat(val);
+          if (p < 0.0001) return '$' + p.toFixed(6);
+          if (p < 0.01) return '$' + p.toFixed(4);
+          return '$' + p.toFixed(2);
+        };
+
+        document.getElementById('live-mcap').textContent = formatCurrency(mcap);
+        document.getElementById('live-price').textContent = formatPrice(price);
+        document.getElementById('live-volume').textContent = formatCurrency(volume);
+        document.getElementById('live-liquidity').textContent = formatCurrency(liquidity);
+      }
+    } catch (err) {
+      console.error('Failed to fetch live stats', err);
+      document.getElementById('live-mcap').textContent = 'Error';
+      document.getElementById('live-price').textContent = 'Error';
+      document.getElementById('live-volume').textContent = 'Error';
+      document.getElementById('live-liquidity').textContent = 'Error';
+    }
+  }
+
+  // Initial fetch and set interval for updates (every 30 seconds)
+  fetchLiveStats();
+  setInterval(fetchLiveStats, 30000);
 </script>
 
 </body>
